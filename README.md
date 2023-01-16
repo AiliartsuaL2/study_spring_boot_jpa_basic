@@ -99,6 +99,84 @@ JPA에서 가장 중요한 2가지
         - 엔티티 수정(변경감지, dirty Checking)
             - 영속상태에 들어간 이후, 값을 변경하고서 persist를 안해줘도 자바 컬렉션처럼 자동으로 업데이트 쿼리를 날림
             - JPA는 값을 최초에 읽어온 시점에 스냅샷으로 저장해두고 commit 시점에 엔티티와 스냅샷을 비교한다. 값이 다를경우 update 쿼리를 날림.
+            - 플러시
+    - 영속성 컨텍스트의 변경 내용을 데이터베이스에 반영하는 것 , 영속성 컨텍스트의 변경사항과 데이터베이스를 맞추는 작업
+    - 플러시 발생 (DB 커밋)
+        - 변경 감지 (더티 체킹)
+        - 수정된 엔티티 쓰기 지연 SQL 저장소에 등록
+        - 쓰기지연 SQL 저장소의 쿼리를 DB에 전송
+    - 영속성 컨텍스트 플러시 하는 방법
+        - em.flush() 
+            - 강제로 플러시 처리, 플러시 처리가 즉시 일어남, 1차 캐시는 유지가 된다
+        - 트랜잭션 커밋
+        - JPQL 쿼리 실행
+            - JPQL 실행 전 쌓여있던 쿼리들을 무조건 flush함,,
+    - 플러시란 영속성 컨텍스트를 비우는게 아니고, 변경내용을 DB에 동기화하는 것,
+    - 트랜잭션이라는 작업 단위가 중요함,, 커밋 직전에만 동기화 시키면 된다,
+- 준영속 상태
+    - 영속 상태의 엔티티가 영속성 컨텍스트에서 분리됨(detached)
+    - 영속성 컨텍스트가 제공하는 기능을 사용 못 함
+    - 준영속 상태로 만드는 방법
+        - em.detach(entity) : 특정 엔티티만 준영속 상태로 전환
+        - em.clear() : 영속성 컨텍스트를 완전히 초기화
+        - em.close() : 영속성 컨텍스트를 종료
 
-    
+엔티티 매핑
+- 객체와 테이블 매핑
+    - @Entity
+        - 위 어노테이션이 붙은 클래스를 엔티티라고 하고, JPA가 관리한다.
+        - JPA를 사용해서 테이블과 매핑할 클래스는 @Entity가 필수이다.
+        - 주의점
+            - 기본 생성자가 필수이다(파라미터가 없는 public 또는 protected 생성자)
+            - final 클래스 ,enum,interface,inner 클래스는 못쓴다.
+            - db에 저장할 필드에 final 사용 금지
+        - 속성
+            - name : 엔티티 이름을 지정하는데, 기본값은 클래스 이름을 그대로 사용,, 같은 클래스 이름이 없으면 가급적 기본값을 사용(아니면 \너무 헷갈림)
+    - @Table
+        - 엔티티와 매핑할 테이블 지정
+        - 속성 
+            - name : DB 테이블의 이름을 지정한다.
+            - catalog : 데이터베이스 catalog 매핑
+            - schema : 데이터베이스 스키마 매핑
+            - uniqueConstraints : DDL 생성시 유니크 제약 조건 생성
+- 데이터베이스 스키마 자동 생성
+    - DDL을 애플리케이션 실행 시점에 자동 생성한다. (운영 x 개발단계에서 사용)
+    - DB 방언을 활용하여 DB에 맞는 적절한 DDL 생성해줌, (꼭 개발에서 사용)
+    - 속성 (persistence.xml에서 hibernate.hbm2ddl.auto value=“????”)
+        - create : 기존 테이블 삭제 후 다시 생성, (DROP-CREATE)
+        - create-drop : create와 같으나 애플리케이션이 끝날때 drop 시킴
+        - update : 변경 부분만 반영,,alter table등 ..(운영 DB에서 사용 금지)
+        - validate : 엔티티와 테이블이 정상 매핑이 되었을때만 사용
+        - none : 안쓸경우에,, (이런 속성 없는데 관례상 none이라고 함)
+    - 운영 장비에는 절대 create, create-drop, update 사용하면 안된다..
+        - 개발 초기에는 create 또는 update 사용
+        - 테스트 서버는 update 또는 validate
+        - 스테이징과 운영 서버는 validate 또는 none
+    - DDL 생성 기능
+        - unique, nullable, length 등,, 속성 추가,, DDL을 자동 생성 할 때만 사용되고 JPA 실행 로직에는 영향을 주지 않음
+- 필드와 컬럼 매핑
+    - @Column : 해당 엔티티와 매핑할 DB의 컬럼명
+        - 속성 
+            - name : 필드와 매핑 할 테이블의 컬럼 이름
+            - insertable, updatable : 등록, 변경 가능 여부, 기본값 True
+            - nullable(DDL) : 널 여부 체크,, 기본값 true,, false 시 NotNull
+            - unique(DDL) : 유니크 제약조건 만들어줌,, 잘 안쓴다. (제약조건 이름이 랜덤이라 이름을 못 알아보기 때문에 @Table에서 씀)
+            - columnDefinition : 데이터베이스 컬럼 정보를 직접 줄 수 있다. “varchar(100) default ‘EMPTY’”등
+            - length(DDL) : 문자 길이 제약조건,, String 타입에만 사용
+            - precision, scale(DDL) : BigInteger이나BicDecimal 타입에서 사용,, precision은 소수점 포함 전체 자리수, scale은 소수 자리수   
+    - @Enumerated : enum타입을 매핑하기위한 ,, enumType : STRING 써야함
+        - 주의사항 : enumType은 ORDINAL이 기본인데, 이렇게되면 enum 순서를(숫자) DB에 저장하고, STRING을 쓰면 이름(문자)을 순서로 DB에 저장 
+            - ORDINAL이라면 요구사항이 변경되면 해당 데이터가 뭘 했던건지 모름
+    - @Temporal : 날짜를 매핑하기위한 어노테이션
+        - DATE :  DB의 날짜 타입
+        - TIME : DB의 시간 타입
+        - TIMESTAMP : DB의 날짜+시간타입
+        - 자바 8부터는 LocalDate, LocalDateTime을 통해 생략 가능
+    - @Lob : BLOB, CLOB,, 
+        - 지정하는 속성이 없음, 필드 타입이 문자면 CLOB, 나머지는 BLOB 매핑
+    - @Transient : 매핑 하고싶지 않은 컬럼 
+- 기본 키 매핑
+    - @Id
+- 연관관계 매핑
+    - @ManyToOne, @JoinColumn
  
